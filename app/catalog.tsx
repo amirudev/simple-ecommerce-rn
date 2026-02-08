@@ -16,11 +16,12 @@ import {
     View,
 } from "react-native";
 import { API_BASE_URL, BASE_URL } from "../constants/Config";
+import { useCart } from "../context/CartContext";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 56) / 2;
 
-const CATEGORIES = ["All", "Electronics", "Fashion", "Home"];
+// Categories will be dynamically loaded
 
 const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -49,6 +50,18 @@ const getImageUrl = (imagePath: string) => {
 
 const ProductCard = ({ product }: { product: Product }) => {
     const [isFavorite, setIsFavorite] = useState(false);
+    const { addToCart } = useCart();
+
+    const handleAddToCart = () => {
+        addToCart({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            image: getImageUrl(product.image),
+            quantity: 1,
+        });
+        Alert.alert("Success", "Added to cart!");
+    };
 
     const handlePress = () => {
         router.push(`/product/${product.id}`);
@@ -93,7 +106,10 @@ const ProductCard = ({ product }: { product: Product }) => {
                 </View>
                 <Text style={styles.productPrice}>{formatPrice(product.price)}</Text>
             </View>
-            <TouchableOpacity style={styles.addToCartButton}>
+            <TouchableOpacity
+                style={styles.addToCartButton}
+                onPress={handleAddToCart}
+            >
                 <Ionicons name="bag-add-outline" size={18} color="#fff" />
             </TouchableOpacity>
         </TouchableOpacity>
@@ -103,8 +119,9 @@ const ProductCard = ({ product }: { product: Product }) => {
 export default function CatalogScreen() {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
-    const [cartCount, setCartCount] = useState(0);
+    const { cartCount } = useCart();
     const [products, setProducts] = useState<Product[]>([]);
+    const [categories, setCategories] = useState<string[]>(["All"]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -129,11 +146,18 @@ export default function CatalogScreen() {
                     isNew: item.isFeatured || false, // Use isFeatured or date logic
                 }));
                 setProducts(mappedProducts);
+
+                // Extract unique categories
+                const uniqueCategories = Array.from(
+                    new Set(mappedProducts.map((p) => p.category.toLowerCase()))
+                ).map(cat => cat.charAt(0).toUpperCase() + cat.slice(1));
+
+                setCategories(["All", ...uniqueCategories]);
             } else {
                 Alert.alert("Error", "Failed to fetch products");
             }
         } catch (error) {
-            console.error(error);
+            console.error("Fetch Error:", error);
             // Fallback to sample data if connection fails (for demo purposes)
             // In production, show error message
             // Alert.alert("Error", "Could not connect to server"); 
@@ -225,7 +249,7 @@ export default function CatalogScreen() {
                     style={styles.categoriesContainer}
                     contentContainerStyle={styles.categoriesContent}
                 >
-                    {CATEGORIES.map((category) => (
+                    {categories.map((category) => (
                         <TouchableOpacity
                             key={category}
                             style={[

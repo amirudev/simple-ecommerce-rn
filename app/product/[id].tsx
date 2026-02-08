@@ -15,6 +15,7 @@ import {
     Alert,
 } from "react-native";
 import { API_BASE_URL, BASE_URL } from "../../constants/Config";
+import { useCart } from "../../context/CartContext";
 
 const { width } = Dimensions.get("window");
 
@@ -51,6 +52,7 @@ export default function ProductDetailScreen() {
     const [quantity, setQuantity] = useState(1);
     const [selectedColor, setSelectedColor] = useState(0);
     const [isFavorite, setIsFavorite] = useState(false);
+    const { addToCart } = useCart();
     const [product, setProduct] = useState<ProductDetail | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -102,6 +104,19 @@ export default function ProductDetailScreen() {
 
     const incrementQuantity = () => setQuantity((q) => q + 1);
     const decrementQuantity = () => setQuantity((q) => (q > 1 ? q - 1 : 1));
+
+    const handleAddToCart = () => {
+        if (!product) return;
+        addToCart({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            image: getImageUrl(product.image),
+            quantity: quantity,
+            color: product.colors[selectedColor],
+        });
+        Alert.alert("Success", "Added to cart!");
+    };
 
     if (loading) {
         return (
@@ -243,7 +258,11 @@ export default function ProductDetailScreen() {
                         {formatPrice(product.price * quantity)}
                     </Text>
                 </View>
-                <TouchableOpacity style={styles.addToCartBtn} activeOpacity={0.8}>
+                <TouchableOpacity
+                    style={styles.addToCartBtn}
+                    activeOpacity={0.8}
+                    onPress={handleAddToCart}
+                >
                     <LinearGradient
                         colors={["#e94560", "#c73659"]}
                         style={styles.addToCartGradient}
