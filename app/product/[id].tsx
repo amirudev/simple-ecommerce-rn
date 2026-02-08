@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+    ActivityIndicator,
     Dimensions,
     Image,
     ScrollView,
@@ -11,133 +12,17 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Alert,
 } from "react-native";
+import { API_BASE_URL, BASE_URL } from "../../constants/Config";
 
 const { width } = Dimensions.get("window");
 
-// Sample product data (same as catalog)
-const PRODUCTS = [
-    {
-        id: 1,
-        name: "Wireless Headphones",
-        price: 1299000,
-        rating: 4.8,
-        reviews: 128,
-        image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600",
-        category: "Electronics",
-        isNew: true,
-        description:
-            "Experience premium sound quality with our wireless headphones. Featuring advanced noise cancellation, 30-hour battery life, and ultra-comfortable ear cushions. Perfect for music lovers and professionals alike.",
-        features: [
-            "Active Noise Cancellation",
-            "30-hour battery life",
-            "Bluetooth 5.0",
-            "Premium leather cushions",
-            "Foldable design",
-        ],
-        colors: ["#1a1a2e", "#e94560", "#f5f5f5"],
-    },
-    {
-        id: 2,
-        name: "Smart Watch Pro",
-        price: 2499000,
-        rating: 4.9,
-        reviews: 256,
-        image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600",
-        category: "Electronics",
-        isNew: false,
-        description:
-            "Stay connected and track your fitness with our premium Smart Watch Pro. Features heart rate monitoring, GPS tracking, and a stunning AMOLED display that's visible even in bright sunlight.",
-        features: [
-            "AMOLED Display",
-            "Heart Rate Monitor",
-            "GPS Tracking",
-            "Water Resistant 50m",
-            "7-day battery life",
-        ],
-        colors: ["#1a1a2e", "#c0c0c0", "#ffd700"],
-    },
-    {
-        id: 3,
-        name: "Premium Sneakers",
-        price: 1899000,
-        rating: 4.7,
-        reviews: 89,
-        image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600",
-        category: "Fashion",
-        isNew: true,
-        description:
-            "Step up your style with these premium sneakers. Crafted with genuine leather and advanced cushioning technology for all-day comfort. Perfect for both casual and athletic wear.",
-        features: [
-            "Genuine Leather Upper",
-            "Memory Foam Insole",
-            "Non-slip Rubber Sole",
-            "Breathable Design",
-            "Lightweight Construction",
-        ],
-        colors: ["#e94560", "#1a1a2e", "#ffffff"],
-    },
-    {
-        id: 4,
-        name: "Leather Backpack",
-        price: 899000,
-        rating: 4.6,
-        reviews: 67,
-        image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600",
-        category: "Fashion",
-        isNew: false,
-        description:
-            "A perfect blend of style and functionality. This premium leather backpack features multiple compartments, padded laptop sleeve, and water-resistant coating. Ideal for work, travel, or everyday use.",
-        features: [
-            "Genuine Leather",
-            "Padded Laptop Sleeve (15\")",
-            "Water Resistant",
-            "Multiple Compartments",
-            "Adjustable Straps",
-        ],
-        colors: ["#8b4513", "#1a1a2e", "#d2691e"],
-    },
-    {
-        id: 5,
-        name: "Minimal Desk Lamp",
-        price: 459000,
-        rating: 4.5,
-        reviews: 45,
-        image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=600",
-        category: "Home",
-        isNew: false,
-        description:
-            "Illuminate your workspace with this elegant minimal desk lamp. Features adjustable brightness, warm to cool color temperature, and a sleek modern design that complements any desk setup.",
-        features: [
-            "Adjustable Brightness",
-            "3 Color Temperatures",
-            "USB Charging Port",
-            "Touch Control",
-            "Energy Efficient LED",
-        ],
-        colors: ["#ffffff", "#1a1a2e", "#ffd700"],
-    },
-    {
-        id: 6,
-        name: "Coffee Maker",
-        price: 1599000,
-        rating: 4.8,
-        reviews: 112,
-        image: "https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?w=600",
-        category: "Home",
-        isNew: true,
-        description:
-            "Brew barista-quality coffee at home with our premium coffee maker. Features 15-bar pressure, built-in grinder, and milk frother for the perfect cappuccino or latte every time.",
-        features: [
-            "15-bar Pressure System",
-            "Built-in Grinder",
-            "Milk Frother",
-            "Programmable Timer",
-            "Easy Clean System",
-        ],
-        colors: ["#c0c0c0", "#1a1a2e", "#e94560"],
-    },
-];
+const getImageUrl = (imagePath: string) => {
+    if (!imagePath) return "https://via.placeholder.com/600";
+    if (imagePath.startsWith("http")) return imagePath;
+    return `${BASE_URL}/uploads/${imagePath}`;
+};
 
 const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -147,24 +32,96 @@ const formatPrice = (price: number) => {
     }).format(price);
 };
 
+interface ProductDetail {
+    id: number | string;
+    name: string;
+    price: number;
+    rating: number;
+    reviews: number;
+    image: string;
+    category: string;
+    isNew: boolean;
+    description: string;
+    features: string[];
+    colors: string[];
+}
+
 export default function ProductDetailScreen() {
     const { id } = useLocalSearchParams();
     const [quantity, setQuantity] = useState(1);
     const [selectedColor, setSelectedColor] = useState(0);
     const [isFavorite, setIsFavorite] = useState(false);
+    const [product, setProduct] = useState<ProductDetail | null>(null);
+    const [loading, setLoading] = useState(true);
 
-    const product = PRODUCTS.find((p) => p.id === Number(id));
+    useEffect(() => {
+        if (id) {
+            fetchProductDetail();
+        }
+    }, [id]);
 
-    if (!product) {
+    const fetchProductDetail = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch(`${API_BASE_URL}/products/${id}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const item = data.data;
+                setProduct({
+                    id: item._id,
+                    name: item.name,
+                    price: item.price,
+                    rating: item.ratings?.average || 0,
+                    reviews: item.ratings?.count || 0,
+                    image: item.images && item.images.length > 0 ? item.images[0] : "",
+                    category: item.category,
+                    isNew: item.isFeatured || false,
+                    description: item.description,
+                    // Mock features and colors as they are not in backend schema yet
+                    features: [
+                        "High Quality Material",
+                        "Durable Construction",
+                        "Warranty Included",
+                        "Fast Shipping",
+                        "Satisfaction Guaranteed"
+                    ],
+                    colors: ["#1a1a2e", "#e94560", "#f5f5f5"],
+                });
+            } else {
+                Alert.alert("Error", "Product not found");
+                router.back();
+            }
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Error", "Failed to load product details");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const incrementQuantity = () => setQuantity((q) => q + 1);
+    const decrementQuantity = () => setQuantity((q) => (q > 1 ? q - 1 : 1));
+
+    if (loading) {
         return (
-            <View style={styles.container}>
-                <Text style={styles.errorText}>Product not found</Text>
+            <View style={[styles.container, styles.centerContent]}>
+                <StatusBar barStyle="light-content" />
+                <ActivityIndicator size="large" color="#e94560" />
             </View>
         );
     }
 
-    const incrementQuantity = () => setQuantity((q) => q + 1);
-    const decrementQuantity = () => setQuantity((q) => (q > 1 ? q - 1 : 1));
+    if (!product) {
+        return (
+            <View style={[styles.container, styles.centerContent]}>
+                <Text style={styles.errorText}>Product not found</Text>
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <Text style={styles.backButtonText}>Go Back</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -197,7 +154,7 @@ export default function ProductDetailScreen() {
             >
                 {/* Product Image */}
                 <View style={styles.imageContainer}>
-                    <Image source={{ uri: product.image }} style={styles.productImage} />
+                    <Image source={{ uri: getImageUrl(product.image) }} style={styles.productImage} />
                     {product.isNew && (
                         <View style={styles.newBadge}>
                             <Text style={styles.newBadgeText}>NEW</Text>
@@ -311,6 +268,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#0f0f1a",
+    },
+    centerContent: {
+        justifyContent: "center",
+        alignItems: "center",
     },
     header: {
         position: "absolute",
@@ -535,6 +496,18 @@ const styles = StyleSheet.create({
         fontSize: 18,
         color: "#fff",
         textAlign: "center",
-        marginTop: 100,
+        marginTop: 20,
+        marginBottom: 20,
     },
+    backButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        backgroundColor: "#e94560",
+        borderRadius: 12,
+    },
+    backButtonText: {
+        color: "#fff",
+        fontWeight: "600",
+        fontSize: 16,
+    }
 });

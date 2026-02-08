@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+    ActivityIndicator,
     Dimensions,
     Image,
+    Alert,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -13,73 +15,10 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { API_BASE_URL, BASE_URL } from "../constants/Config";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 56) / 2;
-
-// Sample product data
-const PRODUCTS = [
-    {
-        id: 1,
-        name: "Wireless Headphones",
-        price: 1299000,
-        rating: 4.8,
-        reviews: 128,
-        image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300",
-        category: "Electronics",
-        isNew: true,
-    },
-    {
-        id: 2,
-        name: "Smart Watch Pro",
-        price: 2499000,
-        rating: 4.9,
-        reviews: 256,
-        image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300",
-        category: "Electronics",
-        isNew: false,
-    },
-    {
-        id: 3,
-        name: "Premium Sneakers",
-        price: 1899000,
-        rating: 4.7,
-        reviews: 89,
-        image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300",
-        category: "Fashion",
-        isNew: true,
-    },
-    {
-        id: 4,
-        name: "Leather Backpack",
-        price: 899000,
-        rating: 4.6,
-        reviews: 67,
-        image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300",
-        category: "Fashion",
-        isNew: false,
-    },
-    {
-        id: 5,
-        name: "Minimal Desk Lamp",
-        price: 459000,
-        rating: 4.5,
-        reviews: 45,
-        image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=300",
-        category: "Home",
-        isNew: false,
-    },
-    {
-        id: 6,
-        name: "Coffee Maker",
-        price: 1599000,
-        rating: 4.8,
-        reviews: 112,
-        image: "https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?w=300",
-        category: "Home",
-        isNew: true,
-    },
-];
 
 const CATEGORIES = ["All", "Electronics", "Fashion", "Home"];
 
@@ -92,7 +31,7 @@ const formatPrice = (price: number) => {
 };
 
 interface Product {
-    id: number;
+    id: number | string;
     name: string;
     price: number;
     rating: number;
@@ -101,6 +40,12 @@ interface Product {
     category: string;
     isNew: boolean;
 }
+
+const getImageUrl = (imagePath: string) => {
+    if (!imagePath) return "https://via.placeholder.com/300";
+    if (imagePath.startsWith("http")) return imagePath;
+    return `${BASE_URL}/uploads/${imagePath}`;
+};
 
 const ProductCard = ({ product }: { product: Product }) => {
     const [isFavorite, setIsFavorite] = useState(false);
@@ -116,7 +61,10 @@ const ProductCard = ({ product }: { product: Product }) => {
             onPress={handlePress}
         >
             <View style={styles.imageContainer}>
-                <Image source={{ uri: product.image }} style={styles.productImage} />
+                <Image
+                    source={{ uri: getImageUrl(product.image) }}
+                    style={styles.productImage}
+                />
                 {product.isNew && (
                     <View style={styles.newBadge}>
                         <Text style={styles.newBadgeText}>NEW</Text>
@@ -156,15 +104,66 @@ export default function CatalogScreen() {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [cartCount, setCartCount] = useState(0);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const filteredProducts = PRODUCTS.filter((product) => {
+    useEffect(() => {
+        fetchProducts();
+    }, []);
+
+    const fetchProducts = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch(`${API_BASE_URL}/products`);
+            const data = await response.json();
+
+            if (data.success) {
+                const mappedProducts: Product[] = data.data.map((item: any) => ({
+                    id: item._id,
+                    name: item.name,
+                    price: item.price,
+                    rating: item.ratings?.average || 0,
+                    reviews: item.ratings?.count || 0,
+                    image: item.images && item.images.length > 0 ? item.images[0] : "",
+                    category: item.category, // Backend category is lowercase
+                    isNew: item.isFeatured || false, // Use isFeatured or date logic
+                }));
+                setProducts(mappedProducts);
+            } else {
+                Alert.alert("Error", "Failed to fetch products");
+            }
+        } catch (error) {
+            console.error(error);
+            // Fallback to sample data if connection fails (for demo purposes)
+            // In production, show error message
+            // Alert.alert("Error", "Could not connect to server"); 
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filteredProducts = products.filter((product) => {
         const matchesSearch = product.name
             .toLowerCase()
             .includes(searchQuery.toLowerCase());
+
+        // Backend categories are lowercase, Frontend categories are Title Case
+        // Simplify matching by lowercasing both
         const matchesCategory =
-            selectedCategory === "All" || product.category === selectedCategory;
+            selectedCategory === "All" ||
+            product.category.toLowerCase() === selectedCategory.toLowerCase();
+
         return matchesSearch && matchesCategory;
     });
+
+    if (loading) {
+        return (
+            <View style={[styles.container, styles.centerContent]}>
+                <StatusBar barStyle="light-content" />
+                <ActivityIndicator size="large" color="#e94560" />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -257,9 +256,13 @@ export default function CatalogScreen() {
 
                 {/* Products Grid */}
                 <View style={styles.productsGrid}>
-                    {filteredProducts.map((product) => (
-                        <ProductCard key={product.id} product={product} />
-                    ))}
+                    {filteredProducts.length > 0 ? (
+                        filteredProducts.map((product) => (
+                            <ProductCard key={product.id} product={product} />
+                        ))
+                    ) : (
+                        <Text style={styles.noProductsText}>No products found.</Text>
+                    )}
                 </View>
             </ScrollView>
 
@@ -290,6 +293,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#0f0f1a",
+    },
+    centerContent: {
+        justifyContent: "center",
+        alignItems: "center",
     },
     header: {
         paddingTop: 60,
@@ -547,4 +554,11 @@ const styles = StyleSheet.create({
     navTextActive: {
         color: "#e94560",
     },
+    noProductsText: {
+        color: '#8b8b9e',
+        fontSize: 16,
+        marginTop: 20,
+        textAlign: 'center',
+        width: '100%',
+    }
 });
