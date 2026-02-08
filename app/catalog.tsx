@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { API_BASE_URL, BASE_URL } from "../constants/Config";
 import { useCart } from "../context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 56) / 2;
@@ -123,6 +124,25 @@ export default function CatalogScreen() {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<string[]>(["All"]);
     const [loading, setLoading] = useState(true);
+    const { logout, user } = useAuth();
+
+    const handleProfilePress = () => {
+        Alert.alert(
+            "Profile",
+            `Logged in as ${user?.email}`,
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Logout",
+                    style: "destructive",
+                    onPress: logout
+                }
+            ]
+        );
+    };
 
     useEffect(() => {
         fetchProducts();
@@ -304,7 +324,7 @@ export default function CatalogScreen() {
                     <Ionicons name="heart-outline" size={24} color="#8b8b9e" />
                     <Text style={styles.navText}>Wishlist</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem}>
+                <TouchableOpacity style={styles.navItem} onPress={handleProfilePress}>
                     <Ionicons name="person-outline" size={24} color="#8b8b9e" />
                     <Text style={styles.navText}>Profile</Text>
                 </TouchableOpacity>

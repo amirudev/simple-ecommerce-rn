@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,9 +13,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert
 } from "react-native";
 
 export default function LoginScreen() {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -22,8 +25,11 @@ export default function LoginScreen() {
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   const handleLogin = () => {
-    // Navigate to catalog page
-    router.push("/catalog");
+    if (email && password) {
+      login(email);
+    } else {
+      Alert.alert("Error", "Please enter email and password");
+    }
   };
 
   return (
